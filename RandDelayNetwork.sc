@@ -2,16 +2,20 @@
 RandDelayNetwork {
 	classvar <>all;
 	classvar <>initialized = false;
-	var <>dict, <>grow;
 	var <>key;
 	var <>code;
-	var <>source;
+	var <>tree;
 	classvar <>default_grow;
 	classvar <>default_simple_grow;
 	classvar <>default_dict;
-	var <>tree;
+	classvar <>default_specs;
+	classvar <>default_maker;
+	classvar <>default_make_graph;
+	classvar <>default_old_make_graph;
+	var <>dict, <>grow;
 	var <>maker;
 	var <>make_graph;
+	var >define_specs;
 
 	*initClass {
 		all = IdentityDictionary.new;
@@ -41,6 +45,9 @@ RandDelayNetwork {
 		this.initDefaults;
 		grow = grower ? default_grow;
 		dict = dico ? default_dict;
+		make_graph = default_make_graph;
+		maker = default_maker;
+		define_specs = default_specs;
 	}
 
 	initDefaults {
@@ -116,7 +123,59 @@ RandDelayNetwork {
 				}
 			};
 
-			make_graph = { arg in, code, rdnkey;
+			default_make_graph = { arg in, code, rdnkey;
+				var sig;
+				var del, shi;
+				var del2, shi2;
+				var distamp;
+				var hasFreq, afreq;
+				var sig1, sig2, sig3, sig4, sig5, sig6, sig7, sig8;
+				var pitchlag;
+				var pitchmix;
+				var fb;
+				rdnkey = rdnkey ? \default;
+				code = code ? "4--";
+				sig = in;
+				fb = \fb.kr(0.01);
+				del = \delay.kr(1,0.1);
+				del2 = \delay2.kr(1,0.1);
+				shi = \shift.kr(1);
+				shi2 = \shift2.kr(1);
+				distamp = \distamp.kr(1);
+				pitchlag = \pitchlag.kr(1/8) / TempoClock.default.tempo;
+				pitchmix = \pitchmix.kr(0.5);
+
+				sig = LPF.ar(sig, \prelpf.kr(17000));
+				sig = HPF.ar(sig, \prehpf.kr(17));
+
+				sig = sig + (LocalIn.ar(2) * fb);
+
+				sig = LPF.ar(sig, \lpf.kr(17000));
+				sig = HPF.ar(sig, \hpf.kr(17));
+				sig = RandDelayNetwork(rdnkey).ar(sig, code);
+
+				sig1 = sig.tanh * \fbdistamp.kr(1/2.1);
+				sig = SelectX.ar(\fbdistmix.kr(1), [sig, sig1]);
+
+				sig = Limiter.ar(sig);
+
+				sig1 = sig;
+				#afreq, hasFreq = Pitch.kr(sig1).flop;
+				sig1 = BRF.ar(sig1, afreq.lag(pitchlag));
+				#afreq, hasFreq = Pitch.kr(sig1).flop;
+				sig1 = BRF.ar(sig1, afreq.lag(pitchlag));
+				sig = SelectX.ar(pitchmix, [sig, sig1]);
+
+				LocalOut.ar(sig);
+				sig = LPF.ar(sig, \postlpf.kr(17000));
+				sig = HPF.ar(sig, \posthpf.kr(17));
+				sig = Limiter.ar(sig);
+				sig = sig * \wetamp.kr(1);
+				//sig.debug("end sig");
+				sig;
+			};
+
+			default_old_make_graph = { arg in, code, rdnkey;
 				var sig;
 				var del, shi;
 				var del2, shi2;
@@ -144,9 +203,9 @@ RandDelayNetwork {
 				sig = sig.tanh / 2.1;
 				sig = Limiter.ar(sig);
 				sig1 = sig;
-				#afreq, hasFreq = Pitch.kr(sig1.debug("sig")).flop;
+				#afreq, hasFreq = Pitch.kr(sig1).flop;
 				sig1 = BRF.ar(sig1, afreq.lag(pitchlag));
-				#afreq, hasFreq = Pitch.kr(sig1.debug("sig")).flop;
+				#afreq, hasFreq = Pitch.kr(sig1).flop;
 				sig1 = BRF.ar(sig1, afreq.lag(pitchlag));
 				sig = SelectX.ar(\pitchmix.kr(0.5), [sig, sig1]);
 				LocalOut.ar(sig);
@@ -154,17 +213,46 @@ RandDelayNetwork {
 				sig = HPF.ar(sig, \phpf.kr(17));
 				sig = Limiter.ar(sig);
 				sig = sig * \poamp.kr(1);
-				sig.debug("end sig");
+				//sig.debug("end sig");
 				sig;
 			};
 
-			maker = { arg self, name, code, bus, rdnkey;
+			default_specs = { arg obj;
+				var specs = IdentityDictionary.new;
+				specs.put(\fb, ControlSpec(0.0001,0.9,\exp));
+				specs.put(\lpf, \freq.asSpec);
+				specs.put(\hpf, \freq.asSpec);
+				specs.put(\plpf, \freq.asSpec);
+				specs.put(\phpf, \freq.asSpec);
+				specs.put(\postlpf, \freq.asSpec);
+				specs.put(\posthpf, \freq.asSpec);
+				specs.put(\prelpf, \freq.asSpec);
+				specs.put(\prehpf, \freq.asSpec);
+				specs.put(\delay2, \delay.asSpec);
+				specs.put(\shift, ControlSpec(-5,5,\lin));
+				specs.put(\shift2, ControlSpec(-5,5,\lin));
+				specs.put(\pitchmix, \unipolar.asSpec);
+				specs.put(\pitchlag, ControlSpec(0.001,1,\exp));
+
+				specs.put(\fbdistamp, ControlSpec(0.01,20,\exp));
+				specs.put(\fbdistmix, \unipolar.asSpec);
+
+				specs.put(\wet10, \unipolar.asSpec);
+				specs.put(\wet20, \unipolar.asSpec);
+				specs.collect({ arg val, key;
+					Spec.add(key, val);
+					//[key, val].debug("added spec");
+				});
+				specs;
+			};
+
+			default_maker = { arg self, name, code, bus;
 				if(bus.notNil) {
 					Ndef(name).set(\inbus, bus);
 				};
-				Ndef(name)[0] = { InFeedback.ar(\inbus.kr(BusDef(\fx1, \audio,2)), 2);  };
+				Ndef(name)[0] = { InFeedback.ar(\inbus.kr(20), 2);  };
 				Ndef(name).put(10, \filter -> { arg in;
-					self.make_graph.(in, code, rdnkey)
+					self.make_graph.(in, code, self.key)
 				});
 				Ndef(name).put(20, \filter -> { arg in;
 					// master volume
@@ -175,8 +263,20 @@ RandDelayNetwork {
 			/////////////////
 
 			initialized = true;
+
+			this.class.new(\default, default_grow, default_dict);
+			this.class.new(\default).define_specs;
+
+			// not needed because it's already by default on every instances
+			//this.class.new(\default).define_specs = default_spec;
+			//this.class.new(\default).maker = default_maker;
+			//this.class.new(\default).make_graph = default_make_graph;
 		};
 
+	}
+
+	define_specs { arg ... args;
+		^define_specs.(*args);
 	}
 
 	seqcollect { arg in, fun;
@@ -266,17 +366,17 @@ RandDelayNetwork {
 			40.do { arg x;
 				var div = ( num / 32 ).trunc.asInteger;
 				var rest = num % 32;
-				[x, num, div, rest].debug("etape x num div rest");
+				//[x, num, div, rest].debug("etape x num div rest");
 				if(div < 1) {
-					debug("break");
-					[rest, rest.asInteger.asDigit, div, div.asInteger.asDigit].debug("rest then div added:");
+					//debug("break");
+					//[rest, rest.asInteger.asDigit, div, div.asInteger.asDigit].debug("rest then div added:");
 					res.add( ( rest ).asInteger.asDigit );
 					//res.add( ( div ).asInteger.asDigit );
 					break.value;
 				};
 				res.add( ( rest ).asInteger.asDigit );
-				res.debug("res now");
-				[rest, rest.asInteger.asDigit].debug("rest added:");
+				//res.debug("res now");
+				//[rest, rest.asInteger.asDigit].debug("rest added:");
 				num = div;
 			};
 		};
@@ -331,6 +431,19 @@ RandDelayNetwork {
 
 	make { arg ... args;
 		^maker.(this, *args);
+	}
+
+	getPbindCompileString { arg ndef_name;
+		^this.class.getPbindCompileString(ndef_name);
+	}
+
+	*getPbindCompileString { arg ndef_name;
+		^"\nPbind(\n\t%\n)\n".format(
+			Ndef(ndef_name).controlKeysValues.clump(2).collect({ arg p; 
+				"%, %,".format(p[0].asCompileString, p[1].asCompileString)
+			}).join("\n\t")
+		)
+	
 	}
 
 }
