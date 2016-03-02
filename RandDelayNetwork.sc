@@ -351,6 +351,7 @@ RandDelayNetwork {
 		};
 
 		#depth, netseed, valseed = word.split($-).collect({ arg x; 
+			// FIXME: prevent depth to be 10000000
 			if(x.size == 0) {
 				x = this.numberToCode(rrand(0,1000000));
 			};
@@ -397,11 +398,20 @@ RandDelayNetwork {
 		^this.new(\default).codeGen(in, code)
 	}
 
-	seedGen { arg in, depth, netseed, valseed;
+	*randCode { arg depth, netseed, valseed;
+		var cod;
+		if(depth.class == String) {
+			#depth, valseed, cod = this.codeToSeeds(depth)
+		};
 		depth = depth ? 3;
 		valseed = valseed ? rrand(1,1000000);
 		netseed = netseed ? rrand(1,1000000);
-		code = this.class.seedsToCode(depth, netseed, valseed);
+		cod = this.seedsToCode(depth, netseed, valseed);
+		^cod
+	}
+
+	seedGen { arg in, depth, netseed, valseed;
+		code = this.class.randCode(depth, netseed, valseed);
 		"RandDelayNetwork code: %".format(code).postln;
 
 		tree = this.gentree(depth, netseed);
