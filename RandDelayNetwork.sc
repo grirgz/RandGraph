@@ -1,3 +1,16 @@
+// seedGen generate a tree using a given seed
+//		use randCode to generate a code
+// codeGen generate a tree using a given code
+//		first call codeToSeeds to  generate a seed, use a random number if ommited
+//		then call seedGen to generate a tree using the given seed
+//			seedGen call randCode to have a code
+// randCode generate a random code given depht, network seed and value seed
+//		this function have bad name
+//		it is used to get a code from the given seed, seed which are generated from a code which can be random (5--) so we know the final code, not the 5-- one
+//		it can also generate random seed if seed is ommited
+//		
+// codeToSeed convert code to seed using word_to_number 
+// seedToCode convert seed to code using numberToCode for each seed
 
 RandDelayNetwork {
 	classvar <>all;
@@ -133,6 +146,7 @@ RandDelayNetwork {
 				var pitchlag;
 				var pitchmix;
 				var fb;
+				//"default_make_graph".debug("!!!");
 				rdnkey = rdnkey ? \default;
 				code = code ? "4--";
 				sig = in;
@@ -186,10 +200,10 @@ RandDelayNetwork {
 				rdnkey = rdnkey ? \default;
 				code = code ? "4--";
 				sig = in;
-				del = \delay.kr(1,0.1);
-				del2 = \delay2.kr(1,0.1);
-				shi = \shift.kr(1);
-				shi2 = \shift2.kr(1);
+				del = \delay.kr(0.1,0.1);
+				del2 = \delay2.kr(0.1,0.1);
+				shi = \shift.kr(0);
+				shi2 = \shift2.kr(0);
 				distamp = \distamp.kr(1);
 
 				sig = LPF.ar(sig, \prelpf.kr(17000));
@@ -247,6 +261,7 @@ RandDelayNetwork {
 			};
 
 			default_maker = { arg self, name, code, bus;
+				//self.code.debug("default_maker: BEGINN?NN what is code ?");
 				if(bus.notNil) {
 					Ndef(name).set(\inbus, bus);
 				};
@@ -254,6 +269,8 @@ RandDelayNetwork {
 				Ndef(name).put(10, \filter -> { arg in;
 					self.make_graph.(in, code, self.key)
 				});
+				//self.code.debug("default_maker: what is code ?");
+				Ndef(name).addHalo(\code, self.code);
 				Ndef(name).put(20, \filter -> { arg in;
 					// master volume
 					in * \mamp.kr(1)
@@ -443,17 +460,43 @@ RandDelayNetwork {
 		^maker.(this, *args);
 	}
 
-	getPbindCompileString { arg ndef_name;
-		^this.class.getPbindCompileString(ndef_name);
+	getPbindCompileString { arg ndef_name=\rdn, exclude_args, begin;
+		^this.class.getPbindCompileString(ndef_name, exclude_args, begin);
 	}
 
-	*getPbindCompileString { arg ndef_name;
-		^"\nPbind(\n\t%\n)\n".format(
+	*getPbindCompileString { arg ndef_name=\rdn, exclude_args, begin;
+		exclude_args = exclude_args ?? { [\inbus] };
+		begin = begin ? "\nPbind(\n\t%\n)\n";
+		^begin.format(
 			Ndef(ndef_name).controlKeysValues.clump(2).collect({ arg p; 
-				"%, %,".format(p[0].asCompileString, p[1].asCompileString)
-			}).join("\n\t")
+				if(exclude_args.includes(p[0]).not) {
+					"%, %,".format(p[0].asCompileString, p[1].asCompileString)
+				} {
+					nil
+				}
+			}).reject(_.isNil).join("\n\t")
 		)
-	
 	}
 
+	getPresetCompileString { arg ndef_name=\rdn, exclude_args;
+		var co = Ndef(ndef_name).getHalo(\code) ? code;
+		var pbind;
+		pbind = this.getPbindCompileString(ndef_name, exclude_args,"Pbind(\n\t%\n).keep(1)");
+		co = co.asCompileString;
+		^(
+			"(\nRandDelayNetwork(%).make(%, %);\n"
+			++"Ndef(%).put(100, \\pset -> %);\n);\n"
+		).format(key.asCompileString, ndef_name.asCompileString, co, ndef_name.asCompileString, pbind )
+	}
+}
+
+// not the best place for theses useful additions
++ String {
+	pbcopy {
+		"xsel -ib <<EOD\n%\nEOD".format(this).unixCmd
+	}
+
+	vimpbpaste {
+		"vim --servername scvim --remote-send '<Esc>\"+p<Enter>'".unixCmd;
+	}
 }
