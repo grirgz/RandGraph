@@ -501,6 +501,6 @@ RandDelayNetwork {
 	}
 
 	vimpaste {
-		"vim --servername scvim --remote-send '<Esc>:a<Enter>%\n<C-c>'".format(this).unixCmd;
+		"vim --servername scvim --remote-send '<Esc>:a!<Enter>%\n<C-c>'".format(this).unixCmd;
 	}
 }
