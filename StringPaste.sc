@@ -13,8 +13,14 @@
 		"vim --servername scvim --remote-send '<Esc>:a!<Enter>%\n<C-c>'".format(this).unixCmd;
 	}
 
-	editorInsert {
-		this.pbcopy;
-		"vim --servername scvim --remote-send '<Esc>\"+p<Enter>'".unixCmd;
+	editorInsert { arg inblock=true;
+		//this.pbcopy;
+		var str = this;
+		if(inblock) {
+			str = "(\n%\n);\n".format(str)
+		};
+
+		"cat > /tmp/scclipboard <<EOD\n%\nEOD".format(str).unixCmd; // bug with xsel + vim + big buffer
+		"vim --servername scvim --remote-send '<Esc>:read /tmp/scclipboard<Enter>'".unixCmd;
 	}
 }
