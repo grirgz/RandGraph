@@ -488,5 +488,16 @@ RandDelayNetwork {
 			++"Ndef(%).put(100, \\pset -> %);\n);\n"
 		).format(key.asCompileString, ndef_name.asCompileString, co, ndef_name.asCompileString, pbind )
 	}
+
+	presetCompileString { arg ndef_name=\rdn, exclude_args;
+		var co = Ndef(ndef_name).getHalo(\code) ? code;
+		var pbind;
+		pbind = this.getPbindCompileString(ndef_name, exclude_args,"Pbind(\n\t%\n).keep(1)");
+		co = co.asCompileString;
+		^(
+			"RandDelayNetwork(%).make(%, %);\n"
+			++"Ndef(%).put(100, \\pset -> %);\n"
+		).format(key.asCompileString, ndef_name.asCompileString, co, ndef_name.asCompileString, pbind )
+	}
 }
 
