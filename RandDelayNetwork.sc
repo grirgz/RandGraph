@@ -429,7 +429,7 @@ RandDelayNetwork {
 
 	seedGen { arg in, depth, netseed, valseed;
 		code = this.class.randCode(depth, netseed, valseed);
-		"RandDelayNetwork code: %".format(code).postln;
+		"RandDelayNetwork %: Code: %".format(key, code).postln;
 
 		tree = this.gentree(depth, netseed);
 		thisThread.randSeed = valseed;
