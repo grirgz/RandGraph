@@ -1,5 +1,6 @@
 // seedGen generate a tree using a given seed
 //		use randCode to generate a code
+//		this then interpret the whole tree to return an UGen graph
 // codeGen generate a tree using a given code
 //		first call codeToSeeds to  generate a seed, use a random number if ommited
 //		then call seedGen to generate a tree using the given seed
@@ -16,8 +17,8 @@ RandDelayNetwork {
 	classvar <>all;
 	classvar <>initialized = false;
 	var <>key;
-	var <>code;
-	var <>tree;
+	var <>code; // overwritten at each make
+	var <>tree; // overwritten at each make
 	classvar <>default_grow;
 	classvar <>default_simple_grow;
 	classvar <>default_dict;
@@ -418,7 +419,7 @@ RandDelayNetwork {
 	*randCode { arg depth, netseed, valseed;
 		var cod;
 		if(depth.class == String) {
-			#depth, valseed, cod = this.codeToSeeds(depth)
+			#depth, valseed, cod = this.class.codeToSeeds(depth)
 		};
 		depth = depth ? 3;
 		valseed = valseed ? rrand(1,1000000);
@@ -434,6 +435,16 @@ RandDelayNetwork {
 		tree = this.gentree(depth, netseed);
 		thisThread.randSeed = valseed;
 		^this.interpret(in, tree, dict, ());
+	}
+
+	codeToTree { arg code;
+		// generate tree without overwriting code and tree instance vars
+		var mytree, mycode;
+		var depth, netseed, valseed;
+		#depth, netseed, valseed = this.class.codeToSeeds(code);
+		mycode = this.class.randCode(depth, netseed, valseed);
+		mytree = this.gentree(depth, netseed);
+		^mytree
 	}
 
 	*seedGen { arg in, depth, netseed, valseed;
