@@ -32,6 +32,7 @@ RandDelayNetwork {
 	var >define_specs;
 
 	*initClass {
+		Class.initClassTree(Spec);
 		all = IdentityDictionary.new;
 	}
 
